@@ -1,0 +1,49 @@
+import streamlit as st
+from pdf2image import convert_from_bytes
+import pytesseract
+import cv2
+import numpy as np
+from PIL import Image
+from pyzbar.pyzbar import decode
+
+st.set_page_config(page_title="Guardião", layout="wide")
+st.title("🛡️ Guardião – Verificador de Documentos")
+
+uploaded_file = st.file_uploader("📤 Envie um PDF de fatura ou boleto", type=["pdf"])
+if uploaded_file:
+    images = convert_from_bytes(uploaded_file.read(), dpi=300)
+    for i, page in enumerate(images):
+        st.subheader(f"📄 Página {i+1}")
+        img = np.array(page)
+        gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
+        blur = cv2.GaussianBlur(gray, (5, 5), 0)
+        _, binary = cv2.threshold(blur, 150, 255, cv2.THRESH_BINARY_INV)
+        contours, _ = cv2.findContours(binary, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+        suspeitas = 0
+        for c in contours:
+            x, y, w, h = cv2.boundingRect(c)
+            if w > 30 and h > 10:
+                cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                suspeitas += 1
+        st.image(img, caption=f"🔎 {suspeitas} áreas suspeitas detectadas")
+
+        text = pytesseract.image_to_string(page, lang="por")
+        st.text_area("📄 Texto OCR", text, height=200)
+
+        codes = decode(np.array(page))
+        if codes:
+            st.markdown("📦 **Códigos detectados:**")
+            for c in codes:
+                st.code(c.data.decode("utf-8"))
+        else:
+            st.markdown("❌ Nenhum código QR ou de barras detectado.")
+requirements.txt
+txt
+Copiar
+Editar
+streamlit
+pdf2image
+pytesseract
+opencv-python
+Pillow
+pyzbar
